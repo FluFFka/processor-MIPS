@@ -1,4 +1,4 @@
-all: test main
+all: main
 
 main:
 	iverilog -o bin/main src/*
