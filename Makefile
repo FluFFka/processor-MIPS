@@ -1,9 +1,13 @@
-all:
+all: test main
+
+main:
 	iverilog -o bin/main src/*
 
-tests:
-	iverilog -o bin/register_tb test/register_tb.v
-	bin/register_tb
+test:
+	iverilog -o bin/Register_tb tests/Register_tb.v
+	bin/Register_tb
+	iverilog -o bin/RegisterZero_tb tests/RegisterZero_tb.v
+	bin/RegisterZero_tb
 
 clean:
-	rm -rf bin/*
+	rm -rf bin/* vcd/*
