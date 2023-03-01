@@ -1,14 +1,17 @@
 `include "src/CPU.v"
 
 module CPU_tb();
-    reg clock = 0;
-    always #1 clock = !clock;
+    reg clk = 0;
+    reg rst = 1;
+    always #1 clk = !clk;
     initial #20 $finish;
     
-    CPU cpu(.clock(clock));
+    CPU cpu(.clk(clk), .rst(rst));
     initial begin
         $dumpfile("vcd/CPU_tb.vcd");
         $dumpvars(1, cpu);
+        $dumpvars(1, cpu.im);
         $dumpvars(1, CPU_tb);
+        rst <= #4 0;
     end
 endmodule

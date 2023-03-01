@@ -1,7 +1,9 @@
 module RegisterZero (
-    input [31:0] in, input clock, input load,
+    input [31:0] in, input clk, input rst, input load,
     output reg [31:0] out
 ); 
-    always @(posedge clock)
-        out <= 32'b0;
+    always @(posedge clk) begin
+        if (rst) out <= 0;
+        out <= 0;
+    end
 endmodule

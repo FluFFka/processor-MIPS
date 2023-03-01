@@ -1,9 +1,10 @@
 module ProgramCounter (
-    input [31:0] in, input clock, input load,
+    input [31:0] in, input clk, input rst, input load,
     output reg [31:0] out
 
 );
-    always @(posedge clock) begin
-        if (load) out <= in;
+    always @(posedge clk) begin
+        if (rst) out <= 0;
+        else if (load) out <= in;
     end
 endmodule

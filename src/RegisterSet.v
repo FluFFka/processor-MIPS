@@ -3,7 +3,7 @@
 
 module RegisterSet (
     input [4:0] rnum1, input [4:0] rnum2, input [4:0] wnum,
-    input clock, input write, input [31:0] wdata,
+    input clk, input rst, input write, input [31:0] wdata,
     output reg [31:0] rdata1, output reg [31:0] rdata2
 );
     /*
@@ -25,13 +25,13 @@ module RegisterSet (
     wire [31:0] register_output [31:0];
     reg register_load [31:0];
     // $zero initialization
-    RegisterZero zero(.in(register_input[0]), .clock(clock), .load(register_load[0]),
+    RegisterZero zero(.in(register_input[0]), .clk(clk), .load(register_load[0]),
         .out(register_output[0]));
     // other registers initialization
     genvar j;
     generate
         for (j = 1; j <= 31; j = j + 1)
-            Register r(.in(register_input[j]), .clock(clock), .load(register_load[j]),
+            Register r(.in(register_input[j]), .clk(clk), .load(register_load[j]),
                 .out(register_output[j]));
     endgenerate
 
@@ -39,17 +39,22 @@ module RegisterSet (
     genvar i;
     generate
         for (i = 0; i <= 31; i = i + 1) begin
-            always @(posedge clock) begin
-                register_load[i] <= 1'b0;
-                if (i == rnum1) begin
-                    rdata1 <= register_output[i];
-                end
-                if (i == rnum2) begin
-                    rdata2 <= register_output[i];
-                end
-                if (write && (i == wnum)) begin
-                    register_input[i] <= wdata;
-                    register_load[i] <= 1'b1;
+            always @(posedge clk) begin
+                // register_load[i] <= 1'b0;
+                if (rst) begin
+                    rdata1 <= 0;
+                    rdata2 <= 0;
+                end else begin
+                    if (i == rnum1) begin
+                        rdata1 <= register_output[i];
+                    end
+                    if (i == rnum2) begin
+                        rdata2 <= register_output[i];
+                    end
+                    if (write && (i == wnum)) begin
+                        register_input[i] <= wdata;
+                        register_load[i] <= 1'b1;
+                    end                    
                 end
             end
         end
