@@ -1,3 +1,6 @@
+`include "src/Register.v"
+`include "src/RegisterZero.v"
+
 module RegisterSet (
     input [4:0] rnum1, input [4:0] rnum2, input [4:0] wnum,
     input clock, input write, input [31:0] wdata,
