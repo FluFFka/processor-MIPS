@@ -1,6 +1,11 @@
+`include "include/opcodes.vh"
+`include "include/funct.vh"
+
 `include "src/ProgramCounter.v"
 `include "src/InstructionMemory.v"
 `include "src/DataMemory.v"
+`include "src/RegisterSet.v"
+`include "src/ALU.v"
 
 module CPU (
     input clk, input rst
@@ -18,7 +23,7 @@ module CPU (
 
     wire [31:0] curr_instruction;
     InstructionMemory im(
-        .addr(pc_out), .clk(clk), .rst(rst),
+        .addr(pc_out), .clk(clk),
         .out(curr_instruction)
     );
 
@@ -34,5 +39,44 @@ module CPU (
     wire [15:0] IMM = curr_instruction[15:0];
     // J-type
     wire [25:0] ADDR = curr_instruction[25:0];
+
+
+    wire [4:0] rnum1;
+    wire [4:0] rnum2;
+    wire [4:0] wnum;
+    wire reg_write;
+    wire [31:0] wdata;
+    wire [31:0] rdata1;
+    wire [31:0] rdata2;
+    RegisterSet registers(
+        .rnum1(rnum1), .rnum2(rnum2), .wnum(wnum),
+        .clk(clk), .rst(rst), .write(reg_write), .wdata(wdata),
+        .rdata1(rdata1), .rdata2(rdata2)
+    );
+
+
+    wire alu_zero;
+    wire [31:0] alu_in1;
+    wire [31:0] alu_in2;
+    wire [31:0] alu_out;
+    ALU alu(
+        .in1(alu_in1), .in2(alu_in2), .opcode(opcode), .funct(funct),
+        .out(alu_out), .zero(alu_zero)
+    );
+    assign alu_in1 = rdata1;
+    // alu_in2 later change to multiplexer (for IMM commands)
+    // later add signed and unsigned extension of bus
+    assign alu_in2 = (opcode == `OPCODE_R) ? rdata2 : $unsigned(IMM);
+
+
+
+    assign rnum1 = rs;
+    assign rnum2 = rt;
+    assign wnum = (opcode == `OPCODE_R) ? rd : rt;
+    assign reg_write = (opcode == `OPCODE_BEQ || opcode == `OPCODE_BNE ||
+                        opcode == `OPCODE_J || opcode == `OPCODE_SW) ? 0 : 1;
+    // out later change to multiplexer (for write in data and registers)
+    assign wdata = alu_out;
+
 
 endmodule

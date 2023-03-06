@@ -19,5 +19,5 @@ module DataMemory #(
         end
     endgenerate
 
-    assign out = addr <= MEMORY_SIZE - 4 ? {memory[addr], memory[addr+1], memory[addr+2], memory[addr+3]} : 0;
+    assign out = (addr <= MEMORY_SIZE - 4) ? {memory[addr], memory[addr+1], memory[addr+2], memory[addr+3]} : 0;
 endmodule

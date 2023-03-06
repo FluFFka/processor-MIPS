@@ -11,6 +11,8 @@ module CPU_tb();
         $dumpfile("vcd/CPU_tb.vcd");
         $dumpvars(1, cpu);
         $dumpvars(1, cpu.im);
+        $dumpvars(0, cpu.registers);
+        $dumpvars(1, cpu.alu);
         $dumpvars(1, CPU_tb);
         rst <= #4 0;
     end
