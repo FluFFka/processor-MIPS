@@ -3,8 +3,6 @@
 
 // https://opencores.org/projects/plasma/opcodes
 
-// Здесь хранятся макроопределения для кодов операций MIPS.
-// Названия говорят сами за себя.
 `define OPCODE_R        6'b000000
 `define OPCODE_ADDI     6'b001000
 `define OPCODE_ADDIU    6'b001001
