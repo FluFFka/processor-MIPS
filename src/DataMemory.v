@@ -1,5 +1,5 @@
 module DataMemory #(
-    parameter MEMORY_SIZE = 16
+    parameter MEMORY_SIZE = 64
 ) (
     input [31:0] addr, input [31:0] in, input clk, input rst, input write,
     output [31:0] out

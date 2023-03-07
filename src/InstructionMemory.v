@@ -1,5 +1,5 @@
 module InstructionMemory #(
-    parameter MEMORY_SIZE = 16
+    parameter MEMORY_SIZE = 64
 ) (
     input [31:0] addr, input clk,
     output [31:0] out

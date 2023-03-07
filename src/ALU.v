@@ -7,7 +7,7 @@ module ALU (
         case (opcode)
             `OPCODE_R: begin
                 case (funct)
-                    `FUNCT_ADD: out <= $signed(in1) + $signed(in2);
+                    `FUNCT_ADD: out <= $signed(in1) + $signed(in2); // signed and unsigned doesn't matter (?)
                 endcase
             end
             `OPCODE_ADDIU: out <= $unsigned(in1) + $unsigned(in2);

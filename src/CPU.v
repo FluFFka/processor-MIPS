@@ -18,8 +18,6 @@ module CPU (
         .out(pc_out)
     );
 
-    assign pc_in = pc_out + 4; // later convert to multiplexer (because of jumps)
-
 
     wire [31:0] curr_instruction;
     InstructionMemory im(
@@ -37,8 +35,10 @@ module CPU (
     wire [5:0] funct = curr_instruction[5:0];
     // I-type
     wire [15:0] IMM = curr_instruction[15:0];
+    wire [31:0] EXT_IMM = $signed(IMM);
     // J-type
     wire [25:0] ADDR = curr_instruction[25:0];
+    wire [31:0] EXT_ADDR = $signed(ADDR);
 
 
     wire [4:0] rnum1;
@@ -64,10 +64,7 @@ module CPU (
         .out(alu_out), .zero(alu_zero)
     );
     assign alu_in1 = rdata1;
-    // alu_in2 later change to multiplexer (for IMM commands)
-    // later add signed and unsigned extension of bus
-    assign alu_in2 = (opcode == `OPCODE_R) ? rdata2 : $unsigned(IMM);
-
+    assign alu_in2 = (opcode == `OPCODE_R) ? rdata2 : EXT_IMM;
 
 
     assign rnum1 = rs;
@@ -77,6 +74,14 @@ module CPU (
                         opcode == `OPCODE_J || opcode == `OPCODE_SW) ? 0 : 1;
     // out later change to multiplexer (for write in data and registers)
     assign wdata = alu_out;
+
+
+    assign pc_in = (opcode == `OPCODE_J) ?
+                        $signed(ADDR) : 
+                        ((opcode == `OPCODE_BEQ && rdata1 == rdata2) ||
+                         (opcode == `OPCODE_BNE && rdata1 != rdata2)) ? 
+                            $signed(pc_out) + $signed(EXT_IMM << 2) :
+                            pc_out + 4;
 
 
 endmodule
