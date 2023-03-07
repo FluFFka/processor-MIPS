@@ -38,7 +38,7 @@ module CPU (
     wire [31:0] EXT_IMM = $signed(IMM);
     // J-type
     wire [25:0] ADDR = curr_instruction[25:0];
-    wire [31:0] EXT_ADDR = $signed(ADDR);
+    wire [31:0] EXT_ADDR = $unsigned(ADDR);
 
 
     wire [4:0] rnum1;
@@ -77,10 +77,10 @@ module CPU (
 
 
     assign pc_in = (opcode == `OPCODE_J) ?
-                        $signed(ADDR) : 
+                        EXT_ADDR : 
                         ((opcode == `OPCODE_BEQ && rdata1 == rdata2) ||
                          (opcode == `OPCODE_BNE && rdata1 != rdata2)) ? 
-                            $signed(pc_out) + $signed(EXT_IMM << 2) :
+                            $signed(pc_out) + $signed(EXT_IMM << 2) + 4 :
                             pc_out + 4;
 
 
