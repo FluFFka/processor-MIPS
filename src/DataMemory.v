@@ -14,6 +14,8 @@ module DataMemory #(
             always @(posedge clk) begin
                 if (rst) begin
                     memory[i] <= 0;
+                end else if (write && addr <= MEMORY_SIZE - 4) begin
+                    {memory[addr], memory[addr+1], memory[addr+2], memory[addr+3]} <= in;
                 end
             end
         end

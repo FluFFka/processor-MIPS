@@ -26,6 +26,16 @@ module CPU (
     );
 
 
+    wire [31:0] dm_addr;
+    wire [31:0] dm_in;
+    wire dm_write;
+    wire [31:0] dm_out;
+    DataMemory dm(
+        .addr(dm_addr), .in(dm_in), .clk(clk), .rst(rst), .write(dm_write),
+        .out(dm_out)
+    );
+
+
     wire [5:0] opcode = curr_instruction[31:26];
     // R-type
     wire [4:0] rs = curr_instruction[25:21];    // also for I-type
@@ -45,12 +55,12 @@ module CPU (
     wire [4:0] rnum2;
     wire [4:0] wnum;
     wire reg_write;
-    wire [31:0] wdata;
+    wire [31:0] reg_wdata;
     wire [31:0] rdata1;
     wire [31:0] rdata2;
     RegisterSet registers(
         .rnum1(rnum1), .rnum2(rnum2), .wnum(wnum),
-        .clk(clk), .rst(rst), .write(reg_write), .wdata(wdata),
+        .clk(clk), .rst(rst), .write(reg_write), .wdata(reg_wdata),
         .rdata1(rdata1), .rdata2(rdata2)
     );
 
@@ -70,17 +80,21 @@ module CPU (
     assign rnum1 = rs;
     assign rnum2 = rt;
     assign wnum = (opcode == `OPCODE_R) ? rd : rt;
-    assign reg_write = (opcode == `OPCODE_BEQ || opcode == `OPCODE_BNE ||
-                        opcode == `OPCODE_J || opcode == `OPCODE_SW) ? 0 : 1;
-    // out later change to multiplexer (for write in data and registers)
-    assign wdata = alu_out;
+    assign reg_write = !(opcode == `OPCODE_BEQ || opcode == `OPCODE_BNE ||
+                        opcode == `OPCODE_J || opcode == `OPCODE_SW);
+    assign reg_wdata = (opcode != `OPCODE_LW) ? alu_out : dm_out;
+
+
+    assign dm_addr = alu_out;
+    assign dm_in = rdata2;
+    assign dm_write = (opcode == `OPCODE_SW);
 
 
     assign pc_in = (opcode == `OPCODE_J) ?
                         EXT_ADDR : 
                         ((opcode == `OPCODE_BEQ && rdata1 == rdata2) ||
                          (opcode == `OPCODE_BNE && rdata1 != rdata2)) ? 
-                            $signed(pc_out) + $signed(EXT_IMM << 2) + 4 :
+                            $signed(pc_out) + $signed(EXT_IMM << 2) + 4:
                             pc_out + 4;
 
 
