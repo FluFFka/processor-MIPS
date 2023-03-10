@@ -11,7 +11,7 @@ module DataMemory #(
     genvar i;
     generate
         for (i = 0; i < MEMORY_SIZE; i = i + 1) begin
-            always @(posedge clk) begin
+            always @(posedge clk, posedge rst) begin
                 if (rst) begin
                     memory[i] <= 0;
                 end else if (write && addr <= MEMORY_SIZE - 4) begin

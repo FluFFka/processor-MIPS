@@ -2,7 +2,7 @@
 
 module CPU_tb();
     reg clk = 0;
-    reg rst = 1;
+    reg rst = 0;
     always #1 clk = !clk;
     initial #100 $finish;
     
@@ -16,6 +16,7 @@ module CPU_tb();
         $dumpvars(0, cpu.registers);
         $dumpvars(1, cpu.alu);
         $dumpvars(1, CPU_tb);
+        rst <= #2 1;
         rst <= #4 0;
     end
 endmodule
