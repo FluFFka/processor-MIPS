@@ -13,8 +13,11 @@ module CPU (
     input clk, input rst
 );
 
-    reg stall = 0;
-    wire stall_clk = !stall & clk;
+    wire stall;
+    reg stall_clk = 0;
+    always @(clk) begin
+        if (!stall) stall_clk <= clk;
+    end
 
     reg pc_load = 1;
     wire [31:0] pc_out;
@@ -180,13 +183,11 @@ module CPU (
                     opcode_w == `OPCODE_J || opcode_w == `OPCODE_SW) && write_num_w != 5'b00000;
 
 
-    always @(negedge clk) begin
-        stall <= (read_rs && ((write_e && write_num_e == rs_d) || 
-                                (write_m && write_num_m == rs_d) ||
-                                (write_w && write_num_w == rs_d))) ||
-                   (read_rt && ((write_e && write_num_e == rt_d) || 
-                                (write_m && write_num_m == rt_d) ||
-                                (write_w && write_num_w == rt_d))); // ignoring branching
-    end
+    assign stall = (read_rs && ((write_e && write_num_e == rs_d) || 
+                            (write_m && write_num_m == rs_d) ||
+                            (write_w && write_num_w == rs_d))) ||
+                    (read_rt && ((write_e && write_num_e == rt_d) || 
+                            (write_m && write_num_m == rt_d) ||
+                            (write_w && write_num_w == rt_d))); // ignoring branching
 
 endmodule
