@@ -94,7 +94,7 @@ module CPU (
                         EXT_ADDR : 
                         ((opcode == `OPCODE_BEQ && rdata1 == rdata2) ||
                          (opcode == `OPCODE_BNE && rdata1 != rdata2)) ? 
-                            $signed(pc_out) + $signed(EXT_IMM << 2) + 4 :   // +4 ?
+                            $signed(pc_out) + $signed(EXT_IMM << 2) + 4 :
                             pc_out + 4;
 
 

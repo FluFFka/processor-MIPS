@@ -19,6 +19,7 @@ module ALU (
             `OPCODE_ADDIU:  out <= $unsigned(in1) + $unsigned(in2);
             `OPCODE_LW:     out <= $signed(in1) + $signed(in2);   // calculate address
             `OPCODE_SW:     out <= $signed(in1) + $signed(in2);   // calculate address
+            default:        out <= 0;
         endcase
     assign zero = out == 0;
 endmodule
