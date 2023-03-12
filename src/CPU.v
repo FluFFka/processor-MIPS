@@ -71,8 +71,6 @@ module CPU (
     wire [5:0] funct_d = ir_out_d[5:0];
     wire [15:0] IMM_d = ir_out_d[15:0];
     wire [31:0] EXT_IMM_d = $signed(IMM_d);
-    wire [25:0] ADDR_d = ir_out_d[25:0];
-    wire [31:0] EXT_ADDR_d = $unsigned(ADDR_d);
 
     wire [5:0] opcode_e = ir_out_e[31:26];
     wire [4:0] rs_e = ir_out_e[25:21];
@@ -80,32 +78,16 @@ module CPU (
     wire [4:0] rd_e = ir_out_e[15:11];
     wire [4:0] shamt_e = ir_out_e[10:6];
     wire [5:0] funct_e = ir_out_e[5:0];
-    wire [15:0] IMM_e = ir_out_e[15:0];
-    wire [31:0] EXT_IMM_e = $signed(IMM_e);
-    wire [25:0] ADDR_e = ir_out_e[25:0];
-    wire [31:0] EXT_ADDR_e = $unsigned(ADDR_e);
 
     wire [5:0] opcode_m = ir_out_m[31:26];
     wire [4:0] rs_m = ir_out_m[25:21];
     wire [4:0] rt_m = ir_out_m[20:16];
     wire [4:0] rd_m = ir_out_m[15:11];
-    wire [4:0] shamt_m = ir_out_m[10:6];
-    wire [5:0] funct_m = ir_out_m[5:0];
-    wire [15:0] IMM_m = ir_out_m[15:0];
-    wire [31:0] EXT_IMM_m = $signed(IMM_m);
-    wire [25:0] ADDR_m = ir_out_m[25:0];
-    wire [31:0] EXT_ADDR_m = $unsigned(ADDR_m);
 
     wire [5:0] opcode_w = ir_out_w[31:26];
     wire [4:0] rs_w = ir_out_w[25:21];
     wire [4:0] rt_w = ir_out_w[20:16];
     wire [4:0] rd_w = ir_out_w[15:11];
-    wire [4:0] shamt_w = ir_out_w[10:6];
-    wire [5:0] funct_w = ir_out_w[5:0];
-    wire [15:0] IMM_w = ir_out_w[15:0];
-    wire [31:0] EXT_IMM_w = $signed(IMM_w);
-    wire [25:0] ADDR_w = ir_out_w[25:0];
-    wire [31:0] EXT_ADDR_w = $unsigned(ADDR_w);
 
 
     wire [4:0] wnum;
@@ -134,14 +116,12 @@ module CPU (
     Register pc_out_d_delayer(.in(pc_out), .clk(stall_clk), .rst(rst), .load(1'b1), .out(pc_out_d));
 
 
-    // assign alu_in1:
     wire [31:0] rdata1_d = (read_rs && (write_e && write_num_e == rs_d)) ? alu_out : // bypass from e stage
                                             (read_rs && (write_m && write_num_m == rs_d)) ? reg_wdata_before :  // bypass from m stage
                                             (read_rs && (write_w && write_num_w == rs_d)) ? reg_wdata : // bypass from w stage
                                             rdata1;
     wire [31:0] alu_in1_before = rdata1_d;
     Register alu_in1_e_delayer(.in(alu_in1_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in1));
-    // assign alu_in2:
     wire [31:0] rdata2_d = (read_rt && (write_e && write_num_e == rt_d)) ? alu_out :   // bypass from e stage
                                             (read_rt && (write_m && write_num_m == rt_d)) ? reg_wdata_before :  // bypass from m stage
                                             (read_rt && (write_w && write_num_w == rt_d)) ? reg_wdata : // bypass from w stage
@@ -149,14 +129,13 @@ module CPU (
     wire [31:0] alu_in2_before = (opcode_d != `OPCODE_R) ? EXT_IMM_d : rdata2_d;
     Register alu_in2_e_delayer(.in(alu_in2_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in2));
     wire [31:0] rdata2_e;
-    Register rdata2_e_delayer(.in(rdata2_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_e));  // alu_in2_before - because of bypass - it's corrected rdata2.
+    Register rdata2_e_delayer(.in(rdata2_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_e));
     wire [31:0] rdata1_e;
-    Register rdata1_e_delayer(.in(rdata1_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata1_e));  // alu_in2_before - because of bypass - it's corrected rdata2.
+    Register rdata1_e_delayer(.in(rdata1_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata1_e));
     wire [31:0] pc_out_e;
     Register pc_out_e_delayer(.in(pc_out_d), .clk(clk), .rst(rst), .load(1'b1), .out(pc_out_e));
 
 
-    // assign dm_addr:
     Register dm_addr_m_delayer(.in(alu_out), .clk(clk), .rst(rst), .load(1'b1), .out(dm_addr));
     wire [31:0] rdata2_m;
     Register rdata2_m_delayer(.in(rdata2_e), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_m));
@@ -169,7 +148,6 @@ module CPU (
     assign wnum = (opcode_w == `OPCODE_R) ? rd_w : rt_w;
     assign reg_write = !(opcode_w == `OPCODE_BEQ || opcode_w == `OPCODE_BNE ||
                         opcode_w == `OPCODE_J || opcode_w == `OPCODE_SW);
-    // assign reg_wdata:
     wire [31:0] reg_wdata_before = (opcode_m != `OPCODE_LW) ? dm_addr : dm_out;
     Register dm_addr_w_delayer(.in(reg_wdata_before), .clk(clk), .rst(rst), .load(1'b1), .out(reg_wdata));
 
