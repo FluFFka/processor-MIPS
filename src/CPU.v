@@ -137,14 +137,21 @@ module CPU (
 
 
     // assign alu_in1:
-    Register alu_in1_e_delayer(.in(rdata1), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in1));
+    wire [31:0] alu_in1_before = (read_rs && (write_e && write_num_e == rs_d)) ? alu_out :  // bypass from e stage
+                                    (read_rs && (write_m && write_num_m == rs_d)) ? reg_wdata_before :  // bypass from m stage
+                                    (read_rs && (write_w && write_num_w == rs_d)) ? reg_wdata : // bypass from w stage
+                                    rdata1;
+    Register alu_in1_e_delayer(.in(alu_in1_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in1));
     // assign alu_in2:
-    wire [31:0] alu_in2_before = (opcode_d == `OPCODE_R) ? rdata2 : EXT_IMM_d;
+    wire [31:0] rdata2_bypass_corrected = (read_rt && (write_e && write_num_e == rt_d)) ? alu_out :   // bypass from e stage
+                                            (read_rt && (write_m && write_num_m == rt_d)) ? reg_wdata_before :  // bypass from m stage
+                                            (read_rt && (write_w && write_num_w == rt_d)) ? reg_wdata : // bypass from w stage
+                                            rdata2;
+    wire [31:0] alu_in2_before = (opcode_d != `OPCODE_R) ? EXT_IMM_d : rdata2_bypass_corrected;
     Register alu_in2_e_delayer(.in(alu_in2_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in2));
     wire [31:0] rdata2_e;
-    Register rdata2_e_delayer(.in(rdata2), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_e));
-    wire [31:0] rdata1_e;
-    Register rdata1_e_delayer(.in(rdata1), .clk(clk), .rst(rst), .load(1'b1), .out(rdata1_e));
+    Register rdata2_e_delayer(.in(rdata2_bypass_corrected), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_e));  // alu_in2_before - because of bypass - it's corrected rdata2.
+    wire [31:0] rdata1_e = alu_in1; // delayed. alu_in1_before - corrected rdata1 according to bypass
     wire [31:0] pc_out_e;
     Register pc_out_e_delayer(.in(pc_out_d), .clk(clk), .rst(rst), .load(1'b1), .out(pc_out_e));
 
@@ -176,9 +183,9 @@ module CPU (
                             pc_out + 4; // if not jump: continue as usual
 
 
-    wire read_rs = !(opcode_d == `OPCODE_J) && rs_d != 5'b00000;
+    wire read_rs = !(opcode_d == `OPCODE_J) && rs_d != 5'b00000;    // zero register is always zero, no hazards with it
     wire read_rt = (opcode_d == `OPCODE_R || opcode_d == `OPCODE_SW ||
-                    opcode_d == `OPCODE_BEQ || opcode_d == `OPCODE_BNE) && rt_d != 5'b00000;    // zero register is always zero, no hazards with it
+                    opcode_d == `OPCODE_BEQ || opcode_d == `OPCODE_BNE) && rt_d != 5'b00000;
     wire [4:0] write_num_e = (opcode_e == `OPCODE_R) ? rd_e : rt_e;
     wire write_e = !(opcode_e == `OPCODE_BEQ || opcode_e == `OPCODE_BNE ||
                     opcode_e == `OPCODE_J || opcode_e == `OPCODE_SW) && write_num_e != 5'b00000;
@@ -190,11 +197,6 @@ module CPU (
                     opcode_w == `OPCODE_J || opcode_w == `OPCODE_SW) && write_num_w != 5'b00000;
 
 
-    assign stall = (read_rs && ((write_e && write_num_e == rs_d) || 
-                            (write_m && write_num_m == rs_d) ||
-                            (write_w && write_num_w == rs_d))) ||
-                    (read_rt && ((write_e && write_num_e == rt_d) || 
-                            (write_m && write_num_m == rt_d) ||
-                            (write_w && write_num_w == rt_d))); // ignoring branching
+    assign stall = (opcode_e == `OPCODE_LW && read_rs && (write_e && write_num_e == rs_d));
 
 endmodule
