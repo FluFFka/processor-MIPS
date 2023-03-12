@@ -28,12 +28,10 @@ module CPU (
     );
 
     wire [31:0] ir_out_f, ir_out_d, ir_out_e, ir_out_m, ir_out_w;
-    wire [31:0] ir_in_e = (stall ||
-                            (opcode_e == `OPCODE_BEQ && rdata1_e == rdata2_e) ||   // must jump on new address
-                            (opcode_e == `OPCODE_BNE && rdata1_e != rdata2_e) ||
-                            (opcode_m == `OPCODE_BEQ && rdata1_m == rdata2_m) ||   // keep flushing next command too
-                            (opcode_m == `OPCODE_BNE && rdata1_m != rdata2_m)) ? `NOOP : ir_out_d;
-    Register IR_D(.in(ir_out_f), .clk(stall_clk), .rst(rst), .load(1'b1), .out(ir_out_d));    
+    wire [31:0] ir_in_d = (opcode_d == `OPCODE_BEQ && rdata1_d == rdata2_d) ||   // must jump on new address
+                            (opcode_d == `OPCODE_BNE && rdata1_d != rdata2_d) ? `NOOP : ir_out_f;
+    wire [31:0] ir_in_e = stall ? `NOOP : ir_out_d;
+    Register IR_D(.in(ir_in_d), .clk(stall_clk), .rst(rst), .load(1'b1), .out(ir_out_d));    
     Register IR_E(.in(ir_in_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_e));    
     Register IR_M(.in(ir_out_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_m));    
     Register IR_W(.in(ir_out_m), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_w));  
@@ -137,21 +135,23 @@ module CPU (
 
 
     // assign alu_in1:
-    wire [31:0] alu_in1_before = (read_rs && (write_e && write_num_e == rs_d)) ? alu_out :  // bypass from e stage
-                                    (read_rs && (write_m && write_num_m == rs_d)) ? reg_wdata_before :  // bypass from m stage
-                                    (read_rs && (write_w && write_num_w == rs_d)) ? reg_wdata : // bypass from w stage
-                                    rdata1;
+    wire [31:0] rdata1_d = (read_rs && (write_e && write_num_e == rs_d)) ? alu_out : // bypass from e stage
+                                            (read_rs && (write_m && write_num_m == rs_d)) ? reg_wdata_before :  // bypass from m stage
+                                            (read_rs && (write_w && write_num_w == rs_d)) ? reg_wdata : // bypass from w stage
+                                            rdata1;
+    wire [31:0] alu_in1_before = rdata1_d;
     Register alu_in1_e_delayer(.in(alu_in1_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in1));
     // assign alu_in2:
-    wire [31:0] rdata2_bypass_corrected = (read_rt && (write_e && write_num_e == rt_d)) ? alu_out :   // bypass from e stage
+    wire [31:0] rdata2_d = (read_rt && (write_e && write_num_e == rt_d)) ? alu_out :   // bypass from e stage
                                             (read_rt && (write_m && write_num_m == rt_d)) ? reg_wdata_before :  // bypass from m stage
                                             (read_rt && (write_w && write_num_w == rt_d)) ? reg_wdata : // bypass from w stage
                                             rdata2;
-    wire [31:0] alu_in2_before = (opcode_d != `OPCODE_R) ? EXT_IMM_d : rdata2_bypass_corrected;
+    wire [31:0] alu_in2_before = (opcode_d != `OPCODE_R) ? EXT_IMM_d : rdata2_d;
     Register alu_in2_e_delayer(.in(alu_in2_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in2));
     wire [31:0] rdata2_e;
-    Register rdata2_e_delayer(.in(rdata2_bypass_corrected), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_e));  // alu_in2_before - because of bypass - it's corrected rdata2.
-    wire [31:0] rdata1_e = alu_in1; // delayed. alu_in1_before - corrected rdata1 according to bypass
+    Register rdata2_e_delayer(.in(rdata2_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_e));  // alu_in2_before - because of bypass - it's corrected rdata2.
+    wire [31:0] rdata1_e;
+    Register rdata1_e_delayer(.in(rdata1_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata1_e));  // alu_in2_before - because of bypass - it's corrected rdata2.
     wire [31:0] pc_out_e;
     Register pc_out_e_delayer(.in(pc_out_d), .clk(clk), .rst(rst), .load(1'b1), .out(pc_out_e));
 
@@ -170,16 +170,16 @@ module CPU (
     assign reg_write = !(opcode_w == `OPCODE_BEQ || opcode_w == `OPCODE_BNE ||
                         opcode_w == `OPCODE_J || opcode_w == `OPCODE_SW);
     // assign reg_wdata:
-    wire [31:0] reg_wdata_before = (opcode_w != `OPCODE_LW) ? dm_addr : dm_out;
+    wire [31:0] reg_wdata_before = (opcode_m != `OPCODE_LW) ? dm_addr : dm_out;
     Register dm_addr_w_delayer(.in(reg_wdata_before), .clk(clk), .rst(rst), .load(1'b1), .out(reg_wdata));
 
 
     assign pc_in = (opcode_f == `OPCODE_J) ?
                         EXT_ADDR_f : 
-                        (opcode_e != `OPCODE_BEQ && opcode_e != `OPCODE_BNE) ? pc_out + 4 :
-                        ((opcode_e == `OPCODE_BEQ && rdata1_e == rdata2_e) ||   // when fetching, need to calculate address - same time as ALU
-                         (opcode_e == `OPCODE_BNE && rdata1_e != rdata2_e)) ?   // if jump: change path, put noop in previous stage
-                            $signed(pc_out_e) + $signed(EXT_IMM_e << 2) + 4 :
+                        (opcode_d != `OPCODE_BEQ && opcode_d != `OPCODE_BNE) ? pc_out + 4 :
+                        ((opcode_d == `OPCODE_BEQ && rdata1_d == rdata2_d) ||
+                         (opcode_d == `OPCODE_BNE && rdata1_d != rdata2_d)) ?   // if jump: change path, put noop in previous stage
+                            $signed(pc_out_d) + $signed(EXT_IMM_d << 2) + 4 :
                             pc_out + 4; // if not jump: continue as usual
 
 
