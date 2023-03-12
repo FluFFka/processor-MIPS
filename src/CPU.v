@@ -28,7 +28,11 @@ module CPU (
     );
 
     wire [31:0] ir_out_f, ir_out_d, ir_out_e, ir_out_m, ir_out_w;
-    wire [31:0] ir_in_e = stall ? `NOOP : ir_out_d;
+    wire [31:0] ir_in_e = (stall ||
+                            (opcode_e == `OPCODE_BEQ && rdata1_e == rdata2_e) ||   // must jump on new address
+                            (opcode_e == `OPCODE_BNE && rdata1_e != rdata2_e) ||
+                            (opcode_m == `OPCODE_BEQ && rdata1_m == rdata2_m) ||   // keep flushing next command too
+                            (opcode_m == `OPCODE_BNE && rdata1_m != rdata2_m)) ? `NOOP : ir_out_d;
     Register IR_D(.in(ir_out_f), .clk(stall_clk), .rst(rst), .load(1'b1), .out(ir_out_d));    
     Register IR_E(.in(ir_in_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_e));    
     Register IR_M(.in(ir_out_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_m));    
@@ -147,8 +151,11 @@ module CPU (
 
     // assign dm_addr:
     Register dm_addr_m_delayer(.in(alu_out), .clk(clk), .rst(rst), .load(1'b1), .out(dm_addr));
-    // assign dm_in:
-    Register rdata2_m_delayer(.in(rdata2_e), .clk(clk), .rst(rst), .load(1'b1), .out(dm_in));
+    wire [31:0] rdata2_m;
+    Register rdata2_m_delayer(.in(rdata2_e), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_m));
+    wire [31:0] rdata1_m;
+    Register rdata1_m_delayer(.in(rdata1_e), .clk(clk), .rst(rst), .load(1'b1), .out(rdata1_m));
+    assign dm_in = rdata2_m;
     assign dm_write = (opcode_m == `OPCODE_SW);
 
 
@@ -162,11 +169,11 @@ module CPU (
 
     assign pc_in = (opcode_f == `OPCODE_J) ?
                         EXT_ADDR_f : 
-                        (opcode_e != `OPCODE_BEQ && opcode_e != `OPCODE_BEQ) ? pc_out + 4 :
+                        (opcode_e != `OPCODE_BEQ && opcode_e != `OPCODE_BNE) ? pc_out + 4 :
                         ((opcode_e == `OPCODE_BEQ && rdata1_e == rdata2_e) ||   // when fetching, need to calculate address - same time as ALU
-                         (opcode_e == `OPCODE_BNE && rdata1_e != rdata2_e)) ?   // when fetching, stall
+                         (opcode_e == `OPCODE_BNE && rdata1_e != rdata2_e)) ?   // if jump: change path, put noop in previous stage
                             $signed(pc_out_e) + $signed(EXT_IMM_e << 2) + 4 :
-                            pc_out_e + 4;
+                            pc_out + 4; // if not jump: continue as usual
 
 
     wire read_rs = !(opcode_d == `OPCODE_J) && rs_d != 5'b00000;
