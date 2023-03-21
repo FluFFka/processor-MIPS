@@ -6,26 +6,22 @@
 module CPU (
     input clk, input rst
 );
-
     wire stall;
-    reg stall_clk = 0;
-    always @(clk) begin
-        if (!stall) stall_clk <= clk;
-    end
 
-    reg pc_load = 1;
+    wire pc_load = !stall;
     wire [31:0] pc_out;
     wire [31:0] pc_in;
     ProgramCounter PC(
-        .in(pc_in), .clk(stall_clk), .rst(rst), .load(pc_load),
+        .in(pc_in), .clk(clk), .rst(rst), .load(pc_load),
         .out(pc_out)
     );
 
+    wire ir_load_d = !stall;
     wire [31:0] ir_out_f, ir_out_d, ir_out_e, ir_out_m, ir_out_w;
     wire [31:0] ir_in_d = (opcode_d == `OPCODE_BEQ && rdata1_d == rdata2_d) ||   // must jump on new address
                             (opcode_d == `OPCODE_BNE && rdata1_d != rdata2_d) ? `NOOP : ir_out_f;
     wire [31:0] ir_in_e = stall ? `NOOP : ir_out_d;
-    Register IR_D(.in(ir_in_d), .clk(stall_clk), .rst(rst), .load(1'b1), .out(ir_out_d));    
+    Register IR_D(.in(ir_in_d), .clk(clk), .rst(rst), .load(ir_load_d), .out(ir_out_d));    
     Register IR_E(.in(ir_in_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_e));    
     Register IR_M(.in(ir_out_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_m));    
     Register IR_W(.in(ir_out_m), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_w));  
@@ -106,8 +102,9 @@ module CPU (
     );
 
 
+    wire pc_load_d = !stall;
     wire [31:0] pc_out_d;
-    Register pc_out_d_delayer(.in(pc_out), .clk(stall_clk), .rst(rst), .load(1'b1), .out(pc_out_d));
+    Register pc_out_d_delayer(.in(pc_out), .clk(clk), .rst(rst), .load(pc_load_d), .out(pc_out_d));
 
 
     wire [31:0] rdata1_d = (read_rs && (write_e && write_num_e == rs_d)) ? alu_out : // bypass from e stage
