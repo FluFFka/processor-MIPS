@@ -1,5 +1,3 @@
-`include "src/Register.v"
-
 module Register_tb();
     reg clk = 0;
     reg rst = 0;

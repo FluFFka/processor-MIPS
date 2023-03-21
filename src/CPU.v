@@ -1,12 +1,6 @@
 `include "include/opcodes.vh"
 `include "include/funct.vh"
 
-`include "src/ProgramCounter.v"
-`include "src/InstructionMemory.v"
-`include "src/DataMemory.v"
-`include "src/RegisterSet.v"
-`include "src/ALU.v"
-
 `define NOOP    32'h00000000
 
 module CPU (

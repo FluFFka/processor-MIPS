@@ -1,5 +1,3 @@
-`include "src/CPU.v"
-
 module CPU_tb();
     reg clk = 0;
     reg rst = 0;

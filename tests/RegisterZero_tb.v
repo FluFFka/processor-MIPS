@@ -1,5 +1,3 @@
-`include "src/RegisterZero.v"
-
 module RegisterZero_tb();
     reg clk = 0;
     reg rst = 0;

@@ -1,3 +1,6 @@
+`include "include/opcodes.vh"
+`include "include/funct.vh"
+
 module ALU (
     input [31:0] in1, input [31:0] in2,
     input [5:0] opcode, input [5:0] funct,
