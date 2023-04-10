@@ -7,12 +7,13 @@ module CPU (
     input clk, input rst
 );
     wire stall;
+    wire stall_l1_cache_miss = !l1_cache_hit & !l1_cache_stall;
 
     wire pc_load = !stall;
     wire [31:0] pc_out;
     wire [31:0] pc_in;
     ProgramCounter PC(
-        .in(pc_in), .clk(clk), .rst(rst), .load(pc_load),
+        .in(pc_in), .clk(clk), .rst(rst), .load(pc_load & !stall_l1_cache_miss),
         .out(pc_out)
     );
 
@@ -21,10 +22,10 @@ module CPU (
     wire [31:0] ir_in_d = (opcode_d == `OPCODE_BEQ && rdata1_d == rdata2_d) ||   // must jump on new address
                             (opcode_d == `OPCODE_BNE && rdata1_d != rdata2_d) ? `NOOP : ir_out_f;
     wire [31:0] ir_in_e = stall ? `NOOP : ir_out_d;
-    Register IR_D(.in(ir_in_d), .clk(clk), .rst(rst), .load(ir_load_d), .out(ir_out_d));    
-    Register IR_E(.in(ir_in_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_e));    
-    Register IR_M(.in(ir_out_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_m));    
-    Register IR_W(.in(ir_out_m), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_w));  
+    Register IR_D(.in(ir_in_d), .clk(clk), .rst(rst), .load(ir_load_d & !stall_l1_cache_miss), .out(ir_out_d));
+    Register IR_E(.in(ir_in_e), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(ir_out_e));    
+    Register IR_M(.in(ir_out_e), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(ir_out_m));    
+    Register IR_W(.in(ir_out_m), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(ir_out_w));  
 
     InstructionMemory #(.MEMORY_SIZE(128)) im(
         .addr(pc_out), .clk(clk),
@@ -36,10 +37,25 @@ module CPU (
     wire [31:0] dm_in;
     wire dm_write;
     wire [31:0] dm_out;
+
+    wire [31:0] l1_cache_addr;
+    wire [31:0] l1_cache_in;
+    wire l1_cache_stall = !(opcode_m == `OPCODE_SW || opcode_m == `OPCODE_LW);
+    wire [31:0] l1_cache_out;
+    wire l1_cache_hit;
+
     DataMemory #(.MEMORY_SIZE(512)) dm(
         .addr(dm_addr), .in(dm_in), .clk(clk), .rst(rst), .write(dm_write),
         .out(dm_out)
     );
+
+    Cache l1_cache(
+        .addr(l1_cache_addr), .in(l1_cache_in), .clk(clk), .rst(rst), .write(l1_cache_write),
+        .stall(l1_cache_stall), .cached_out(dm_out),
+        .out(l1_cache_out), .hit(l1_cache_hit),
+        .cached_addr(dm_addr), .cached_in(dm_in), .cached_write(dm_write)
+    );
+
 
     wire [5:0] opcode_f = ir_out_f[31:26];
     wire [4:0] rs_f = ir_out_f[25:21];
@@ -103,7 +119,7 @@ module CPU (
 
     wire pc_load_d = !stall;
     wire [31:0] pc_out_d;
-    Register pc_out_d_delayer(.in(pc_out), .clk(clk), .rst(rst), .load(pc_load_d), .out(pc_out_d));
+    Register pc_out_d_delayer(.in(pc_out), .clk(clk), .rst(rst), .load(pc_load_d & !stall_l1_cache_miss), .out(pc_out_d));
 
 
     wire [31:0] rdata1_d = (read_rs && (write_e && write_num_e == rs_d)) ? alu_out : // bypass from e stage
@@ -111,35 +127,37 @@ module CPU (
                                             (read_rs && (write_w && write_num_w == rs_d)) ? reg_wdata : // bypass from w stage
                                             rdata1;
     wire [31:0] alu_in1_before = rdata1_d;
-    Register alu_in1_e_delayer(.in(alu_in1_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in1));
+    Register alu_in1_e_delayer(.in(alu_in1_before), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(alu_in1));
     wire [31:0] rdata2_d = (read_rt && (write_e && write_num_e == rt_d)) ? alu_out :   // bypass from e stage
                                             (read_rt && (write_m && write_num_m == rt_d)) ? reg_wdata_before :  // bypass from m stage
                                             (read_rt && (write_w && write_num_w == rt_d)) ? reg_wdata : // bypass from w stage
                                             rdata2;
     wire [31:0] alu_in2_before = (opcode_d != `OPCODE_R) ? EXT_IMM_d : rdata2_d;
-    Register alu_in2_e_delayer(.in(alu_in2_before), .clk(clk), .rst(rst), .load(1'b1), .out(alu_in2));
+    Register alu_in2_e_delayer(.in(alu_in2_before), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(alu_in2));
     wire [31:0] rdata2_e;
-    Register rdata2_e_delayer(.in(rdata2_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_e));
+    Register rdata2_e_delayer(.in(rdata2_d), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(rdata2_e));
     wire [31:0] rdata1_e;
-    Register rdata1_e_delayer(.in(rdata1_d), .clk(clk), .rst(rst), .load(1'b1), .out(rdata1_e));
+    Register rdata1_e_delayer(.in(rdata1_d), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(rdata1_e));
     wire [31:0] pc_out_e;
-    Register pc_out_e_delayer(.in(pc_out_d), .clk(clk), .rst(rst), .load(1'b1), .out(pc_out_e));
+    Register pc_out_e_delayer(.in(pc_out_d), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(pc_out_e));
 
 
-    Register dm_addr_m_delayer(.in(alu_out), .clk(clk), .rst(rst), .load(1'b1), .out(dm_addr));
+    wire [31:0] alu_out_m;
+    Register alu_out_m_delayer(.in(alu_out), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(alu_out_m));
+    assign l1_cache_addr = alu_out_m;
     wire [31:0] rdata2_m;
-    Register rdata2_m_delayer(.in(rdata2_e), .clk(clk), .rst(rst), .load(1'b1), .out(rdata2_m));
+    Register rdata2_m_delayer(.in(rdata2_e), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(rdata2_m));
     wire [31:0] rdata1_m;
-    Register rdata1_m_delayer(.in(rdata1_e), .clk(clk), .rst(rst), .load(1'b1), .out(rdata1_m));
-    assign dm_in = rdata2_m;
-    assign dm_write = (opcode_m == `OPCODE_SW);
+    Register rdata1_m_delayer(.in(rdata1_e), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(rdata1_m));
+    assign l1_cache_in = rdata2_m;
+    assign l1_cache_write = (opcode_m == `OPCODE_SW);
 
 
     assign wnum = (opcode_w == `OPCODE_R) ? rd_w : rt_w;
     assign reg_write = !(opcode_w == `OPCODE_BEQ || opcode_w == `OPCODE_BNE ||
                         opcode_w == `OPCODE_J || opcode_w == `OPCODE_SW);
-    wire [31:0] reg_wdata_before = (opcode_m != `OPCODE_LW) ? dm_addr : dm_out;
-    Register dm_addr_w_delayer(.in(reg_wdata_before), .clk(clk), .rst(rst), .load(1'b1), .out(reg_wdata));
+    wire [31:0] reg_wdata_before = (opcode_m != `OPCODE_LW) ? alu_out_m : l1_cache_out;
+    Register alu_out_w_delayer(.in(reg_wdata_before), .clk(clk), .rst(rst), .load(!stall_l1_cache_miss), .out(reg_wdata));
 
 
     assign pc_in = (opcode_f == `OPCODE_J) ?

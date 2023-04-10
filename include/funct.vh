@@ -1,6 +1,7 @@
 `ifndef __FUNCT_VH
 `define __FUNCT_VH
 
+`define FUNCT_NOOP  6'b000000
 `define FUNCT_ADD   6'b100000
 `define FUNCT_ADDU  6'b100001
 `define FUNCT_SUB   6'b100010

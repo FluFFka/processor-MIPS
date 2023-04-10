@@ -1,21 +1,19 @@
-module DataCache #(
+module Cache #(
     parameter INDEX_SIZE = 2,               // k; 2^k - number of strings in cache
     parameter BLOCK_OFFSET_SIZE = 4,        // b; 2^b - size of cache string in bytes; b must be at least 2 (2^2=4 - word size)
     parameter ASSOCIATIVE_BLOCKS_NUM = 2    // number of associative blocks
 ) (
     input [31:0] addr, input [31:0] in, input clk, input rst, input write,
-    input stall, input cached_out,  // output of cached memory to get information from it
+    input stall, input [31:0] cached_out,  // output of cached memory to get information from it
     output [31:0] out, output hit,
     output [31:0] cached_addr, output [31:0] cached_in, output cached_write // inputs for cached memory
 );
-    
-
     localparam TAG_SIZE = 32 - INDEX_SIZE - BLOCK_OFFSET_SIZE;
     wire [TAG_SIZE-1:0] tag = addr[31:31-TAG_SIZE];
     wire [INDEX_SIZE-1:0] index = addr[31-TAG_SIZE-1:BLOCK_OFFSET_SIZE];
 
-    localparam STRINGS_NUM = 2 << INDEX_SIZE;
-    localparam DATA_BLOCK_SIZE = 2 << BLOCK_OFFSET_SIZE;
+    localparam STRINGS_NUM = 1 << INDEX_SIZE;
+    localparam DATA_BLOCK_SIZE = 1 << BLOCK_OFFSET_SIZE;
 
     reg valids[0:ASSOCIATIVE_BLOCKS_NUM-1][0:STRINGS_NUM-1];
     genvar valids_init_i;
@@ -59,9 +57,9 @@ module DataCache #(
         assign hits[i] = (valids[i][index] && (tags[i][index] == tag));
         integer ii = i; // indexing for data, hack for iverilog
         assign out = hits[ii] ? {data_blocks[ii][index][in_bo0],
-                                data_blocks[ii][index][in_bo1],
-                                data_blocks[ii][index][in_bo2],
-                                data_blocks[ii][index][in_bo3]} : 32'bz;
+                                 data_blocks[ii][index][in_bo1],
+                                 data_blocks[ii][index][in_bo2],
+                                 data_blocks[ii][index][in_bo3]} : 32'bz;
     end
     assign hit = |hits;
     
@@ -77,7 +75,6 @@ module DataCache #(
     
     integer word_addr_to_load = 0;  // adress in block
 
-    assign cached_addr = addr + word_addr_to_load;
     wire [BLOCK_OFFSET_SIZE-1:0] write_bo0 = word_addr_to_load;
     wire [BLOCK_OFFSET_SIZE-1:0] write_bo1 = word_addr_to_load+1;
     wire [BLOCK_OFFSET_SIZE-1:0] write_bo2 = word_addr_to_load+2;
@@ -87,9 +84,10 @@ module DataCache #(
                         data_blocks[curr_associative_block][index][write_bo2],
                         data_blocks[curr_associative_block][index][write_bo3]};
     assign cached_write = !stall && !hit && valids[curr_associative_block][index];
+    assign cached_addr = cached_write ? {tags[curr_associative_block][index], index, word_addr_to_load} : addr + word_addr_to_load - 4;
 
 
-    wire [31:0] curr_associative_block = curr_pop[index];   // associative block to push; size of wire should be floor(log2(STRINGS_NUM))+1
+    wire [31:0] curr_associative_block = curr_pop[index];   // associative block to push; actually size of wire should be floor(log2(STRINGS_NUM))+1
     wire [BLOCK_OFFSET_SIZE-1:0] load_bo0 = word_addr_to_load-4;
     wire [BLOCK_OFFSET_SIZE-1:0] load_bo1 = word_addr_to_load-3;
     wire [BLOCK_OFFSET_SIZE-1:0] load_bo2 = word_addr_to_load-2;
@@ -100,28 +98,44 @@ module DataCache #(
             if (valids[curr_associative_block][index]) begin
                 if ((word_addr_to_load + 4) % DATA_BLOCK_SIZE == 0) begin
                     valids[curr_associative_block][index] <= 1'b0;
+                    word_addr_to_load <= 0;
+                end else begin
+                    word_addr_to_load <= word_addr_to_load + 4;                
                 end
-                word_addr_to_load <= word_addr_to_load + 4;
             end else begin
                 if (word_addr_to_load != 0) begin
                     {data_blocks[curr_associative_block][index][load_bo0],
-                    data_blocks[curr_associative_block][index][load_bo1],
-                    data_blocks[curr_associative_block][index][load_bo2],
-                    data_blocks[curr_associative_block][index][load_bo3]} <= cached_out;            
+                     data_blocks[curr_associative_block][index][load_bo1],
+                     data_blocks[curr_associative_block][index][load_bo2],
+                     data_blocks[curr_associative_block][index][load_bo3]} <= cached_out;            
                 end
                 if (word_addr_to_load != 0 && word_addr_to_load % DATA_BLOCK_SIZE == 0) begin
                     valids[curr_associative_block][index] <= 1'b1;
                     tags[curr_associative_block][index] <= tag;
                     word_addr_to_load <= 0;
+                    curr_pop[index] <= (curr_pop[index] + 1) % ASSOCIATIVE_BLOCKS_NUM;
                 end else begin
                     word_addr_to_load <= word_addr_to_load + 4;
                 end
             end
 
         end
-        if (!stall && hit && write) begin
-            // write right to cache
+    end
+
+
+    genvar k;
+    for (k = 0; k < ASSOCIATIVE_BLOCKS_NUM; k = k + 1) begin
+        always @(posedge clk) begin
+            if (hits[k]) begin
+                if (!stall && write) begin
+                    {data_blocks[k][index][in_bo0],
+                     data_blocks[k][index][in_bo1],
+                     data_blocks[k][index][in_bo2],
+                     data_blocks[k][index][in_bo3]} <= in;
+                end
+            end
         end
     end
+    assign hit = |hits;
 
 endmodule

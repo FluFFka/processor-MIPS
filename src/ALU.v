@@ -16,6 +16,7 @@ module ALU (
                     `FUNCT_SUBU:    out <= $unsigned(in1) - $unsigned(in2);
                     `FUNCT_SLT:     out <= ($signed(in1) < $signed(in2));
                     `FUNCT_SLTU:    out <= ($unsigned(in1) < $unsigned(in2));
+                    `FUNCT_NOOP:    out <= 0;
                 endcase
             end
             `OPCODE_ADDI:   out <= $signed(in1) + $signed(in2);
