@@ -14,12 +14,16 @@ module DataMemory #(
             always @(posedge clk, posedge rst) begin
                 if (rst) begin
                     memory[i] <= 0;
-                end else if (write && addr <= MEMORY_SIZE - 4) begin
-                    {memory[addr], memory[addr+1], memory[addr+2], memory[addr+3]} <= in;
                 end
             end
         end
     endgenerate
+
+    always @(posedge clk) begin
+        if (!rst && write && addr <= MEMORY_SIZE - 4) begin
+            {memory[addr], memory[addr+1], memory[addr+2], memory[addr+3]} <= in;
+        end
+    end
 
     assign out = (addr <= MEMORY_SIZE - 4) ? {memory[addr], memory[addr+1], memory[addr+2], memory[addr+3]} : 0;
 endmodule

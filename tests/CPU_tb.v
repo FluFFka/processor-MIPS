@@ -2,7 +2,7 @@ module CPU_tb();
     reg clk = 0;
     reg rst = 0;
     always #1 clk = !clk;
-    initial #100 $finish;
+    initial #1000 $finish;
     
     CPU cpu(.clk(clk), .rst(rst));
     initial begin

@@ -26,8 +26,7 @@ module CPU (
     Register IR_M(.in(ir_out_e), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_m));    
     Register IR_W(.in(ir_out_m), .clk(clk), .rst(rst), .load(1'b1), .out(ir_out_w));  
 
-
-    InstructionMemory im(
+    InstructionMemory #(.MEMORY_SIZE(128)) im(
         .addr(pc_out), .clk(clk),
         .out(ir_out_f)
     );
@@ -37,7 +36,7 @@ module CPU (
     wire [31:0] dm_in;
     wire dm_write;
     wire [31:0] dm_out;
-    DataMemory dm(
+    DataMemory #(.MEMORY_SIZE(512)) dm(
         .addr(dm_addr), .in(dm_in), .clk(clk), .rst(rst), .write(dm_write),
         .out(dm_out)
     );
