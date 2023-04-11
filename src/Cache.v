@@ -9,8 +9,8 @@ module Cache #(
     output [31:0] cached_addr, output [31:0] cached_in, output cached_write // inputs for cached memory
 );
     localparam TAG_SIZE = 32 - INDEX_SIZE - BLOCK_OFFSET_SIZE;
-    wire [TAG_SIZE-1:0] tag = addr[31:31-TAG_SIZE];
-    wire [INDEX_SIZE-1:0] index = addr[31-TAG_SIZE-1:BLOCK_OFFSET_SIZE];
+    wire [TAG_SIZE-1:0] tag = addr[31:32-TAG_SIZE];
+    wire [INDEX_SIZE-1:0] index = addr[32-TAG_SIZE-1:BLOCK_OFFSET_SIZE];
 
     localparam STRINGS_NUM = 1 << INDEX_SIZE;
     localparam DATA_BLOCK_SIZE = 1 << BLOCK_OFFSET_SIZE;
@@ -83,15 +83,16 @@ module Cache #(
                         data_blocks[curr_associative_block][index][write_bo1],
                         data_blocks[curr_associative_block][index][write_bo2],
                         data_blocks[curr_associative_block][index][write_bo3]};
-    assign cached_write = !stall && !hit && valids[curr_associative_block][index];
-    assign cached_addr = cached_write ? {tags[curr_associative_block][index], index, word_addr_to_load} : addr + word_addr_to_load - 4;
+    assign cached_write = !stall & !hit & valids[curr_associative_block][index];
+    assign cached_addr = cached_write ? {tags[curr_associative_block][index], index, write_bo0} :       // write_bo0 because it is equals to word_addr_to_load but with BLOCK_OFFSET_SIZE width
+                                        {tag, index, write_bo0};
 
 
     wire [31:0] curr_associative_block = curr_pop[index];   // associative block to push; actually size of wire should be floor(log2(STRINGS_NUM))+1
-    wire [BLOCK_OFFSET_SIZE-1:0] load_bo0 = word_addr_to_load-4;
-    wire [BLOCK_OFFSET_SIZE-1:0] load_bo1 = word_addr_to_load-3;
-    wire [BLOCK_OFFSET_SIZE-1:0] load_bo2 = word_addr_to_load-2;
-    wire [BLOCK_OFFSET_SIZE-1:0] load_bo3 = word_addr_to_load-1;
+    wire [BLOCK_OFFSET_SIZE-1:0] load_bo0 = word_addr_to_load;
+    wire [BLOCK_OFFSET_SIZE-1:0] load_bo1 = word_addr_to_load+1;
+    wire [BLOCK_OFFSET_SIZE-1:0] load_bo2 = word_addr_to_load+2;
+    wire [BLOCK_OFFSET_SIZE-1:0] load_bo3 = word_addr_to_load+3;
 
     always @(posedge clk) begin
         if (!stall && !hit) begin
@@ -103,25 +104,22 @@ module Cache #(
                     word_addr_to_load <= word_addr_to_load + 4;                
                 end
             end else begin
-                if (word_addr_to_load != 0) begin
-                    {data_blocks[curr_associative_block][index][load_bo0],
-                     data_blocks[curr_associative_block][index][load_bo1],
-                     data_blocks[curr_associative_block][index][load_bo2],
-                     data_blocks[curr_associative_block][index][load_bo3]} <= cached_out;            
-                end
-                if (word_addr_to_load != 0 && word_addr_to_load % DATA_BLOCK_SIZE == 0) begin
+                {data_blocks[curr_associative_block][index][load_bo0],
+                 data_blocks[curr_associative_block][index][load_bo1],
+                 data_blocks[curr_associative_block][index][load_bo2],
+                 data_blocks[curr_associative_block][index][load_bo3]} <= cached_out;            
+                if ((word_addr_to_load + 4) % DATA_BLOCK_SIZE == 0) begin
                     valids[curr_associative_block][index] <= 1'b1;
                     tags[curr_associative_block][index] <= tag;
                     word_addr_to_load <= 0;
                     curr_pop[index] <= (curr_pop[index] + 1) % ASSOCIATIVE_BLOCKS_NUM;
                 end else begin
-                    word_addr_to_load <= word_addr_to_load + 4;
+                    word_addr_to_load <= word_addr_to_load + 4;                
                 end
             end
 
         end
     end
-
 
     genvar k;
     for (k = 0; k < ASSOCIATIVE_BLOCKS_NUM; k = k + 1) begin
